@@ -1,49 +1,48 @@
 HasPatched = false
 local function get_steam_path()
     -- Query the official Steam registry key
-    local handle = io.popen('reg query "HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam" /v InstallPath 2>nul || reg query "HKLM\\SOFTWARE\\Valve\\Steam" /v InstallPath 2>nul')
+    local handle = io.popen(
+    'reg query "HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam" /v InstallPath 2>nul || reg query "HKLM\\SOFTWARE\\Valve\\Steam" /v InstallPath 2>nul')
     local result = handle:read("*a")
     handle:close()
-    
+
     local path = result:match("InstallPath%s+REG_SZ%s+([^\r\n]+)")
     return path
 end
 
 
 function OnModPreInit()
-
+    local Original = nil
     local steam_path = get_steam_path()
     print("Steam path: " .. (steam_path or "Not found"))
     print("Loading Patch")
 
     --Cant overwrite steam mods, and when we can its too late to patch BEFORE the original mod starts using the file. Makes sense on why it works but doesnt patch with steam mods now
-    local original_script_path = tostring(steam_path).."/steamapps/workshop/content/881100/2572385079/files/debugger.lua" --mods/wand_dbg/files/debugger.lua
+    local original_script_path = tostring(steam_path) ..
+    "/steamapps/workshop/content/881100/2572385079/files/debugger.lua"                                                    --mods/wand_dbg/files/debugger.lua
     local source_file = io.open(original_script_path, "r")
 
-    --Get size of target file
-    local file_size = source_file:seek("end")
-    local Patch_File = io.open("mods/wdbg_patch/files/cachedpatch.lua", "r")
-    local Patch_FS = Patch_File:seek("end") or 0
-    source_file:close()
-    if Patch_File then Patch_File:close() end
-
-    print ("Target file size: ".. tonumber(file_size))
-    print ("Patch file size: ".. tonumber(Patch_FS))
-    if tonumber(file_size) == tonumber(Patch_FS) then
-         print ("Patch Already applied!")
-         HasPatched = true
-    else
-        source_file = io.open(original_script_path, "r")
-        print ("Re-opened file!")
+    --Check if source is in Mods/ instead of steamapps/workshop/content/881100/
+    if source_file == nil then
+        source_file = io.open("mods/wand_dbg/files/debugger.lua", "r")
+        if source_file == nil then
+            print("Original script file not found in either mods/wand_dbg/ or steamapps/workshop/content/881100/")
+            return
+        end
     end
-    
 
+    --If Source is found then See if we made the patch already
+    Original = io.open("mods/wdbg_patch/original.lua", "r")
+
+
+    --only if Original is missing AND enabledpatch is false then proceed with patching, otherwise do nothing here
     --print("Original script file found: ".. source_file)
-    if source_file and not HasPatched then
+    if source_file and (ModSettingGet("wdbg_patch.enabledpatch") and Original == nil) then --if Src file and PatchEnabled AND PatchFile is missing then->
+        Original = {}                                                                      --if not format to table rather than nil so it can be written to file later (write the patch)
         local lines = {}
         local OrigLines = {}
         local line_number = 1
-        
+
         -- Read all lines and modify line 632
         for line in source_file:lines() do
             --save to original file (in line structure)
@@ -52,13 +51,15 @@ function OnModPreInit()
             if line_number == 632 then
                 print("Found line 632: " .. line)
                 local pattern = "EntityHasTag%s*=%s*function%(entity_id,%s*tag%)%s*if%(entity_id%)"
-                local replacement = "EntityHasTag                             = function(entity_id, tag) if(entity_id == type(\"table\"))"
-                
-                
+                local replacement =
+                "EntityHasTag                             = function(entity_id, tag) if(entity_id == type(\"table\"))"
+
+
 
                 -- Apply the replacement to this line
                 local modified_line = string.gsub(line, pattern, replacement)
-                
+
+                --Check if it Actually modified, if it didnt dont save the change incase of syntax errors or messed regex remains
                 if line ~= modified_line then
                     print("Line 632 modified successfully!")
                     print("  Old: " .. line)
@@ -68,45 +69,55 @@ function OnModPreInit()
                     print("Pattern not found on line 632, keeping original")
                     table.insert(lines, line)
                 end
-            else
+
+                --Save to Original.lua
+                table.insert(Original, line)
+            else                             --Just Write the old line to the table
                 table.insert(lines, line)
+                table.insert(Original, line) --Save to Original.lua
             end
             line_number = line_number + 1
         end
         source_file:close()
 
-    --Patch and Cache section
-
         -- Write the modified content back to the original file
         local target_file = io.open(original_script_path, "w")
-        local orig_file = io.open("mods/wdbg_patch/files/cachedoriginal.lua", "w")
-        local Cached_file = io.open("mods/wdbg_patch/files/cachedpatch.lua", "w")
-
-        --write the patch to the Target mod file
-        if target_file then
-            for i, line1 in pairs(lines) do --write the new and old lines at once 
-                --print("Writing line to target file: ".. tostring(line1))
-                target_file:write(line1 .. "\n")
-                Cached_file:write(line1 .. "\n")
-            end
-            target_file:close()
-            Cached_file:close()
-            print("File patched and Cached successfully!")
-
-            --then write the original to a separate file we can restore later if needed
-            for i, line2 in pairs(OrigLines) do
-                orig_file:write(line2 .. "\n")
-            end
-            orig_file:close()
-            print("Original File Cached successfully!")
-        else
-            print("Could not open target file for writing")
+        local Original_Copy = io.open("mods/wdbg_patch/original.lua", "w")
+        --write the copy first
+        for _, line in ipairs(Original) do
+            Original_Copy:write(line .. "\n")
         end
+        Original_Copy:close()
+        print("File Copied successfully!")
 
-        --later on consider editing the enabledmods file in th users save00 folder to disable this mod, the next time its enabled it can re-install the original (maybe if a setting is set to false though)
+        --then write the Patch file to the Target mod
+        for _, line in ipairs(lines) do
+            target_file:write(line .. "\n")
+        end
+        target_file:close()
+        print("File patched successfully!")
+    elseif source_file and (not ModSettingGet("wdbg_patch.enabledpatch") and not Original == nil) then --This is where we will overwrite the mod original with original.lua if enabledpatch is false (removes patch)
+        -- Write the modified content back to the original file
+        local target_file = io.open(original_script_path, "w")
+        local Original_Copy = io.open("mods/wdbg_patch/original.lua", "r")
+        --write the copy overtop of the original
+        for _, line in Original_Copy:lines() do
+            target_file:write(line .. "\n")
+        end
+        Original_Copy:close()
+        print("Original Mod reverted!")
 
+        --then close and delet the Original.lua, (using os.remove as im not sure of any way to do it with safeAPI)
+        target_file:close()
+        os.remove(Original_Copy)
+        print("Patch File Removed!")
 
-    else
-        print("Could not read source file OR already patched (will make this clear in the future)")
+        --these are just fallbacks, not needed but they help me rememeber this whole thing runs 2 times to patch or un-patch
+    elseif source_file and (ModSettingGet("wdbg_patch.enabledpatch") and not Original == nil) then --Just a empty fallback, this means enabled and Already patched
+
+    elseif source_file and (not ModSettingGet("wdbg_patch.enabledpatch") and Original == nil) then --Just a empty fallback, this means disabled and no patch file exists
+
+    else                                                                                           --if this is ever triggered its edge case or wand_dbg is not installed (other edges: SafeMode on, Unshackled missing, ect)
+        print("Could not read source file, please report the issue to the mod author.")
     end
 end
