@@ -146,6 +146,8 @@ function OnModPreInit()
         GamePrint("Patch Reverted. Please restart the game for changes to take effect.")
         --these are just fallbacks, not needed but they help me rememeber this whole thing runs 2 times to patch or un-patch
         HasPatched = true
+
+    --these are just fallbacks, not needed but they help me rememeber this whole thing runs 2 times to patch or un-patch
     elseif source_file and (ModSettingGet("wdbg_patch.enabledpatch") and Original) then --Just a empty fallback, this means enabled and Already patched
         print("Already Patched Original Mod Data (Patched)")   
     elseif source_file and (not ModSettingGet("wdbg_patch.enabledpatch") and not Original) then --Just a empty fallback, this means disabled and no patch file exists
