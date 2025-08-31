@@ -1,0 +1,8 @@
+<Mod
+    name="Wand DBG MP Patch"
+    description="This Overwrites Wand_dbg to fix an error with EntityHasTag() caused by Quants.ew during its patching, Disable if Original mod updates!"
+    tags="quality of life,tweaks,mod dependencies"
+    dont_upload_folders=".git"
+    dont_upload_files=""
+    >
+</Mod>
