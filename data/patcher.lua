@@ -11,16 +11,26 @@ function GetFileStuff()
     return
 end
 function ApplyPatchToTarget()
-    GetFileStuff()
+    --GetFileStuff() --now called as its needed
     ModTextFileSetContent(originalScriptPath, Content)
     Content_new = ModTextFileGetContent(originalScriptPath)
     print("wdbg Patch applied!")
     return
 end
 
+--still in prgress of writing this section, tis ment to overwrite the original script back to the source mod to trigger the restart needed text
+function RemovePatchFromTarget()--just test this, it seems like it will work now but i have to head up (Nope, Cant call ModTextFileGetContent after world has loaded)
+    ModTextFileSetContent(originalScriptPath, Content_orig)
+    Content_new = ModTextFileGetContent(originalScriptPath)
+    print("wdbg Patch applied!")
+    return
+end
 
+
+--Main logic, Runs once on startup
 if patchEnabled and (ModIsEnabled("quant.ew") and ModIsEnabled("wand_dbg")) then
     -- Apply the patch by setting the mod setting to use the patched script
+    GetFileStuff()
     ApplyPatchToTarget()
 else
     GetFileStuff() --set here for init.lua as a falback
