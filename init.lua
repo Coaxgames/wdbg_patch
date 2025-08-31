@@ -5,7 +5,8 @@ function OnModPreInit()
 
     if patchEnabled then
         -- Apply the patch by setting the mod setting to use the patched script
-        ModSettingSet("wand_dbg.script_path", patchedScriptPath)
+        local Content = ModTextFileGetContent(patchedScriptPath)
+        ModTextFileSetContent(originalScriptPath, Content)
         print("wdbg Patch applied!")
         --GamePrint("Patch applied. Please restart the game for changes to take effect.")
     else
