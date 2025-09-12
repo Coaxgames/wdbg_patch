@@ -1,7 +1,8 @@
 <Mod
 	name="Wand DBG MP Fix"
 	description="Fixes Wand DBG for Quants.ew, just patches a single line causing the error upon collecting ANY entity data"
-	request_no_api_restrictions="1" 
-	dependencies="wand_dbg"
+	request_no_api_restrictions="0" 
+	version="1.0.0"
+	dependencies="wand_dbg[1.0.0~3.0.0]"
 >
 </Mod>
